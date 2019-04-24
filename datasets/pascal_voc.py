@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-06 17:16:56
-@LastEditTime: 2019-04-17 20:10:14
-'''
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
@@ -15,9 +6,25 @@ import os.path as osp
 import xml.etree.ElementTree as ET
 import numpy as np
 import mmcv
+# from utils.utils import show_result
+
+def show_result(img, bboxes, labels, class_names, conf_thresh=0.1, thickness=1, font_scale=0.5, 
+    bbox_color='green', text_color='green'):
+    if isinstance(img, str):
+        img = mmcv.imread(img)
+    mmcv.imshow_det_bboxes(
+        img.copy(),
+        bboxes,
+        labels,
+        class_names=class_names,
+        score_thr=conf_thresh,
+        thickness=thickness, 
+        font_scale=font_scale,
+        bbox_color=bbox_color,
+        text_color=text_color)
 
 
-class YoloV1DatasetVOC(data.Dataset):
+class PASCAL_VOC(data.Dataset):
     CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car',
                'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
                'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train',
@@ -29,8 +36,7 @@ class YoloV1DatasetVOC(data.Dataset):
                  num_boxes=2,
                  size_grid_cell=7,
                  img_size=448,
-                 flip_ratio=0,
-                 photo_metric_distortion=None,
+                 do_augmentation=False,
                  transform=None,
                  num_debug_imgs=None,
                  with_difficult=True,
@@ -51,8 +57,7 @@ class YoloV1DatasetVOC(data.Dataset):
         self.img_size = img_size
         self.with_difficult = with_difficult
         self.transform = transform
-        self.flip_ratio = flip_ratio
-        self.photo_metric_distortion = photo_metric_distortion
+        self.do_augmentation = do_augmentation
         self.num_debug_imgs = num_debug_imgs
         self.test_mode = test_mode
         self.cat2label = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}
@@ -220,7 +225,8 @@ class YoloV1DatasetVOC(data.Dataset):
         return boxes, labels
 
     def random_flip(self, img, boxes):
-        if np.random.rand() < self.flip_ratio:
+        # if np.random.rand() < 0.5:
+        if np.random.randint(2):
             img = mmcv.imflip(img)
 
             w = img.shape[1]
@@ -236,73 +242,107 @@ class YoloV1DatasetVOC(data.Dataset):
         # contrast_range=(0.5, 1.5),
         # saturation_range=(0.5, 1.5),
         # hue_delta=18)
-        brightness_delta = self.photo_metric_distortion['brightness_delta']
-        contrast_lower, contrast_upper = self.photo_metric_distortion['contrast_range']
-        saturation_lower, saturation_upper = self.photo_metric_distortion['saturation_range']
-        hue_delta = self.photo_metric_distortion['hue_delta']
+        # brightness_delta = photo_metric_distortion['brightness_delta']
+        # contrast_lower, contrast_upper = photo_metric_distortion['contrast_range']
+        # saturation_lower, saturation_upper = photo_metric_distortion['saturation_range']
+        # hue_delta = self.photo_metric_distortion['hue_delta']
 
-        if self.photo_metric_distortion is not None:
-            # change datatype before do photo metric distortion
-            img = img.astype(np.float32)
-            
-            # random brightness
+        brightness_delta = 32
+        contrast_lower, contrast_upper = (0.5, 1.5)
+        saturation_lower, saturation_upper = (0.5, 1.5)
+        hue_delta = 18
+
+        # change datatype before do photo metric distortion
+        img = img.astype(np.float32)
+        
+        # random brightness
+        if np.random.randint(2):
+            delta = np.random.uniform(-brightness_delta, brightness_delta)
+            img += delta
+            img = img.clip(min=0, max=255)
+                        
+        # mode == 0 --> do random contrast first
+        # mode == 1 --> do random contrast last
+        mode = np.random.randint(2)
+        if mode == 1:
             if np.random.randint(2):
-                delta = np.random.uniform(-brightness_delta, brightness_delta)
-                img += delta
+                alpha = np.random.uniform(contrast_lower, contrast_upper)
+                img *= alpha
                 img = img.clip(min=0, max=255)
-                            
-            # mode == 0 --> do random contrast first
-            # mode == 1 --> do random contrast last
-            mode = np.random.randint(2)
-            if mode == 1:
-                if np.random.randint(2):
-                    alpha = np.random.uniform(contrast_lower, contrast_upper)
-                    img *= alpha
-                    img = img.clip(min=0, max=255)
 
-            # convert color from BGR to HSV
-            img = mmcv.bgr2hsv(img)
+        # convert color from BGR to HSV
+        img = mmcv.bgr2hsv(img)
 
-            # random saturation
+        # random saturation
+        if np.random.randint(2):
+            img[..., 1] *= np.random.uniform(saturation_lower, saturation_upper)
+            img[..., 1] = img[..., 1].clip(min=0, max=1)
+
+        # random hue
+        if np.random.randint(2):
+            img[..., 0] += np.random.uniform(-hue_delta, hue_delta)
+            # img[..., 0][img[..., 0] > 360] -= 360
+            # img[..., 0][img[..., 0] < 0] += 360  
+            img[..., 0] = img[..., 0].clip(min=0, max=360) 
+
+        # convert color from HSV to BGR
+        img = mmcv.hsv2bgr(img)
+        
+        # random contrast
+        if mode == 0:
             if np.random.randint(2):
-                img[..., 1] *= np.random.uniform(saturation_lower, saturation_upper)
-                img[..., 1] = img[..., 1].clip(min=0, max=1)
+                alpha = np.random.uniform(contrast_lower, contrast_upper)
+                img *= alpha
+                img = img.clip(min=0, max=255)
 
-            # random hue
-            if np.random.randint(2):
-                img[..., 0] += np.random.uniform(-hue_delta, hue_delta)
-                # img[..., 0][img[..., 0] > 360] -= 360
-                # img[..., 0][img[..., 0] < 0] += 360  
-                img[..., 0] = img[..., 0].clip(min=0, max=360) 
-
-            # convert color from HSV to BGR
-            img = mmcv.hsv2bgr(img)
-            
-            # random contrast
-            if mode == 0:
-                if np.random.randint(2):
-                    alpha = np.random.uniform(contrast_lower, contrast_upper)
-                    img *= alpha
-                    img = img.clip(min=0, max=255)
-
-            # randomly swap channels
-            # if np.random.randint(2):
-            #     img = img[..., np.random.permutation(3)]
+        # randomly swap channels
+        # if np.random.randint(2):
+        #     img = img[..., np.random.permutation(3)]
         
         return img.astype(np.uint8)
 
     def random_scale(self, img, boxes):
         if np.random.randint(2):
-            scale = np.random.uniform(0.8, 1.2)
+            scale_h = np.random.uniform(0.8, 1.2)
+            scale_w = np.random.uniform(0.8, 1.2) 
             h, w, _ = img.shape
-            img = mmcv.imresize(img, (int(w * scale), h))
-            boxes *= np.tile([scale, 1], 2)
-            boxes = boxes.astype(np.int32)
-            
+            img = mmcv.imresize(img, (int(w*scale_w), int(h*scale_h)), return_scale=False) 
+            scale_boxes = boxes.copy()
+            scale_boxes *= np.tile([scale_w, scale_h], 2)
+            boxes = scale_boxes
         return img, boxes
     
     def random_shift(self, img, boxes, labels):
-        pass
+        # if np.random.randint(2):
+        h, w, c = img.shape
+        mean = [123.675, 116.28, 103.53]    #
+        ratio = 0.4
+        expand_img = np.full((int(h * ratio + h), int(w * ratio + w), c),
+                            mean).astype(img.dtype)
+        expand_img[int(ratio/2 * h) : int(ratio/2 * h + h), int(ratio/2 * w) : int(ratio/2 * w + w)] = img
+        expand_boxes = boxes + np.tile((int(ratio/2 * w), int(ratio/2 * h)), 2)
+        left = int(np.random.uniform(0, ratio * w))
+        top = int(np.random.uniform(0, ratio * h))
+        patch = np.array((int(left), int(top), int(left + w),
+                                  int(top + h)))
+
+        # center of boxes should inside the crop img
+        center = (expand_boxes[:, :2] + expand_boxes[:, 2:]) / 2
+        mask = (center[:, 0] > patch[0]) * (
+            center[:, 1] > patch[1]) * (center[:, 0] < patch[2]) * (
+                center[:, 1] < patch[3])
+        if not mask.any():
+            return img, boxes, labels
+
+        boxes = expand_boxes[mask]
+        labels = labels[mask]
+
+        # adjust boxes
+        img = expand_img[patch[1]:patch[3], patch[0]:patch[2]]
+        boxes[:, 2:] = boxes[:, 2:].clip(max=patch[2:])
+        boxes[:, :2] = boxes[:, :2].clip(min=patch[:2])
+        boxes -= np.tile(patch[:2], 2)     
+        return img, boxes, labels
 
     def random_crop(self, img, boxes, labels):
         h, w, _ = img.shape
@@ -348,16 +388,19 @@ class YoloV1DatasetVOC(data.Dataset):
 
     def prepare_train_img(self, idx):
         img = mmcv.imread(self.img_infos[idx]['filename'])      # (H, W, 3)     
-        # img = mmcv.imresize(img, (self.img_size, self.img_size), return_scale=False)   
         ann = self.get_ann_info(idx)
         boxes, labels = ann['bboxes'], ann['labels']
 
         # data augmentation
-        img = self.random_photo_metric_distortion(img)
-        img, boxes, labels = self.random_crop(img, boxes, labels)
+        if self.do_augmentation:
+            # extra augmentation
+            # img, boxes = self.random_scale(img, boxes)
+            # img, boxes, labels = self.random_shift(img, boxes, labels)
+            img, boxes, labels = self.random_crop(img, boxes, labels)
+            img = self.random_photo_metric_distortion(img)
 
-        # apply transforms
-        img, boxes = self.random_flip(img, boxes)
+            # apply transforms
+            img, boxes = self.random_flip(img, boxes)
         
         # XXX ValueError: some of the strides of a given numpy array are negative.
         # img = img.copy()
@@ -372,8 +415,6 @@ class YoloV1DatasetVOC(data.Dataset):
 
     def prepare_test_img(self, idx):
         img = mmcv.imread(self.img_infos[idx]['filename'])
-        # img = mmcv.imresize(img, (self.img_size, self.img_size), return_scale=False)
-
         ann = self.get_ann_info(idx)
         boxes, labels = ann['bboxes'], ann['labels']
         boxes = torch.Tensor(boxes)
@@ -389,25 +430,10 @@ class YoloV1DatasetVOC(data.Dataset):
         return len(self.img_infos)
         
     def __getitem__(self, idx):
-        # return self.img_infos[idx], self.get_ann_info(0)
         if self.test_mode:
             return self.prepare_test_img(idx)
         else:
             return self.prepare_train_img(idx)
-
-
-def show_result(img, bboxes, labels, score_thr=0.3, thickness=1, font_scale=0.5, 
-    save=False, save_name=None):
-    class_names = YoloV1DatasetVOC.CLASSES
-    img = mmcv.imread(img)
-    mmcv.imshow_det_bboxes(
-        img,
-        bboxes,
-        labels,
-        class_names=class_names,
-        score_thr=score_thr,
-        thickness=thickness, 
-        font_scale=font_scale)
         
 
 if __name__ == '__main__':
@@ -415,7 +441,7 @@ if __name__ == '__main__':
     if vis:
         data_transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((448, 448)),
+            # transforms.Resize((448, 448)),
         ])
     else:
         data_transform = transforms.Compose([
@@ -425,34 +451,26 @@ if __name__ == '__main__':
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         ])
-
-    photo_metric_distortion = dict(
-        brightness_delta=32,
-        contrast_range=(0.5, 1.5),
-        saturation_range=(0.5, 1.5),
-        hue_delta=18)
     
-    train_dataset = YoloV1DatasetVOC(
+    train_dataset = PASCAL_VOC(
         data_root='/Users/xmhan/data/VOCdevkit', 
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/train.txt',
         transform=data_transform,
-        flip_ratio=0.5,
-        photo_metric_distortion=photo_metric_distortion,
+        with_difficult=False,
+        do_augmentation=True,
         num_debug_imgs=64)
 
+    class_names = PASCAL_VOC.CLASSES
     for i, (img, target) in enumerate(train_dataset):
         imgname = train_dataset.img_infos[i]['filename']
+        print(i, imgname)
 
         # Image to numpy
         img = np.array(img)
         h, w, _ = img.shape
 
-        print(i, imgname)
-
-        ann = train_dataset.get_ann_info(i)
-        print(ann)
-
+        # show pred results
         boxes, labels = train_dataset.decoder(target)
         boxes[:, :4] *= torch.Tensor([w, h, w, h])
         
@@ -460,4 +478,13 @@ if __name__ == '__main__':
         labels = labels.numpy().astype(np.int16)
         print(boxes, labels)
         
-        show_result(img, boxes, labels)
+        show_result(img, boxes, labels, class_names)
+
+        # show gt results
+        ann = train_dataset.get_ann_info(i)
+        boxes_gt, labels_gt = ann['bboxes'], ann['labels']
+        boxes_gt_ = np.ones((len(boxes_gt), 5))
+        boxes_gt_[:, :4] = boxes_gt
+        labels_gt -= 1
+        print(boxes_gt_, labels_gt)
+        show_result(imgname, boxes_gt_, labels_gt, class_names, bbox_color='red', text_color='red')

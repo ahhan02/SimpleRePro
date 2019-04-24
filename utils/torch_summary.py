@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-04 14:16:30
-@LastEditTime: 2019-04-09 11:00:09
-'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-04 14:31:32
-@LastEditTime: 2019-04-11 19:25:17
-'''
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,9 +7,13 @@ from torch.autograd import Variable
 class YoloV1Loss(nn.Module):
     '''Loss of YoloV1
     '''
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    def __init__(self, size_grid_cell=7, num_boxes=2, num_classes=20, lambda_coord=5, lambda_noobj=0.5):
+    def __init__(self, 
+                 device='cpu', 
+                 size_grid_cell=7, 
+                 num_boxes=2, 
+                 num_classes=20, 
+                 lambda_coord=5, 
+                 lambda_noobj=0.5):
         '''
         @description: 
         @param : 
@@ -31,6 +25,7 @@ class YoloV1Loss(nn.Module):
         @return: 
         '''
         super(YoloV1Loss, self).__init__()
+        self.device = device
         self.size_grid_cell = size_grid_cell
         self.num_boxes = num_boxes
         self.num_classes = num_classes

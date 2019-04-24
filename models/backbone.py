@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-10 15:44:41
-@LastEditTime: 2019-04-18 17:10:26
-'''
 import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
@@ -250,11 +241,11 @@ class ResNetYoloV1(nn.Module):
         # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         # self.fc = nn.Linear(512 * block.expansion, num_classes)
 
-        self.layer5 = self._make_layer(block, 512, layers[4], stride=2)
+        # receptive field is 483 for layer 4
+        # self.layer5 = self._make_layer(block, 512, layers[4], stride=2)
 
         len_encode = 5 * num_boxes + num_classes
         self.conv_end = conv1x1(512 * block.expansion, len_encode)
-        # self.layer6 = conv1x1(512 * block.expansion, len_encode)
         self.bn_end = nn.BatchNorm2d(len_encode)
 
         for m in self.modules():
@@ -305,12 +296,11 @@ class ResNetYoloV1(nn.Module):
         # x = x.view(x.size(0), -1)
         # x = self.fc(x)
 
-        x = self.layer5(x)
-        x = self.conv_end(x)
-        # x = self.layer6(x)
+        # x = self.layer5(x)
 
         # XXX It's important to use BN to normalize x when using sigmoid function, 
         # otherwise all elems maybe 0s or 1s which cause loss be 0.
+        x = self.conv_end(x)
         x = self.bn_end(x)
         x = torch.sigmoid(x)
         x = x.permute(0, 2, 3, 1)
@@ -323,8 +313,8 @@ def resnet50_yolov1(pretrained=False, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    # model = ResNetYoloV1(Bottleneck, [3, 4, 6, 3], **kwargs)
-    model = ResNetYoloV1(Bottleneck, [3, 4, 6, 3, 3], **kwargs)
+    model = ResNetYoloV1(Bottleneck, [3, 4, 6, 3], **kwargs)
+    # model = ResNetYoloV1(Bottleneck, [3, 4, 6, 3, 3], **kwargs)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet50']), strict=False)
     return model

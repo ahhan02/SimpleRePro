@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-15 16:26:26
-@LastEditTime: 2019-04-15 17:07:30
-'''
 import visdom
 import time
 import numpy as np

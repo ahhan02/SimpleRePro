@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding=UTF-8
-'''
-@Description: 
-@Author: xmhan
-@LastEditors: xmhan
-@Date: 2019-04-12 23:32:48
-@LastEditTime: 2019-04-18 17:21:57
-'''
 import tqdm
 import torch
 import torch.nn as nn
@@ -14,10 +5,10 @@ from torchvision import transforms
 import os
 import os.path as osp
 import numpy as np
-from yolodataset import YoloV1DatasetVOC
+from datasets.pascal_voc import PASCAL_VOC
 from models.backbone import resnet50_yolov1
 import mmcv
-from utils.util import decoder
+from utils.utils import decoder
 import tqdm
 from collections import defaultdict
 
@@ -47,7 +38,7 @@ def voc_ap(rec, prec, use_07_metric=False):
     return ap
 
 
-def voc_eval(logger, det_results, gt_results, class_names, iou_thr=0.5, use_07_metric=False):
+def voc_eval(logger, det_results, gt_results, class_names, iou_thresh=0.5, use_07_metric=False):
     '''
     @description: 
     @param: 
@@ -115,7 +106,7 @@ def voc_eval(logger, det_results, gt_results, class_names, iou_thr=0.5, use_07_m
                 ovmax = np.max(overlaps)
                 jmax = np.argmax(overlaps)
             
-            if ovmax > iou_thr:
+            if ovmax > iou_thresh:
                 if not R['det'][jmax]:
                     tp[d] = 1
                     R['det'][jmax] = 1
@@ -142,22 +133,23 @@ def voc_eval(logger, det_results, gt_results, class_names, iou_thr=0.5, use_07_m
     return _map
 
 
-def calc_map(logger, test_dataset, trial_log=''):
+def calc_map(logger, test_dataset, trial_log, conf_thresh, iou_thresh, nms_thresh):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = resnet50_yolov1()
-    model = nn.DataParallel(model)
-    model_path = osp.join(osp.dirname(__file__), 'checkpoints', trial_log)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
 
+    model_path = osp.join(osp.dirname(__file__), 'checkpoints', trial_log)
     if device.type == 'cpu':
         model.load_state_dict(torch.load(osp.join(model_path, 'latest.pth'), map_location='cpu'))
     else:
         model.load_state_dict(torch.load(osp.join(model_path, 'latest.pth')))
+
     model.to(device)
     model.eval()
 
-    class_names = YoloV1DatasetVOC.CLASSES
-
+    class_names = PASCAL_VOC.CLASSES
     cls_det_results = defaultdict(list)
     cls_img_gt_results = defaultdict(lambda : defaultdict(list))
 
@@ -165,7 +157,7 @@ def calc_map(logger, test_dataset, trial_log=''):
         for i, (img, _) in tqdm.tqdm(enumerate(test_dataset)):
             w, h = test_dataset.img_infos[i]['width'], test_dataset.img_infos[i]['height']
             imgid = test_dataset.img_infos[i]['id']
-            
+
             ann = test_dataset.get_ann_info(i)
             bboxs, labels = ann['bboxes'], ann['labels']
 
@@ -177,20 +169,10 @@ def calc_map(logger, test_dataset, trial_log=''):
             img = img.to(device)
             pred = model(img[None, :, :, :])
 
-            # def convert_input_tensor_dim(in_tensor):
-            #     out_tensor = torch.FloatTensor(in_tensor.size())
-            #     out_tensor[:,:,:,:] = 0.
-            #     out_tensor[:, :, :, 4] = in_tensor[:, :, :, 0]
-            #     out_tensor[:, :, :, 9] = in_tensor[:, :, :, 1]
-            #     out_tensor[:, :, :, :4] = in_tensor[:, :, :, 2:6]
-            #     out_tensor[:, :, :, 5:9] = in_tensor[:, :, :, 6:10]
-            #     out_tensor[:, :, :, 10:] = in_tensor[:, :, :, 10:]
-            #     return out_tensor
-            # pred = convert_input_tensor_dim(pred)
-
-            # dont do nms when computing map
-            # boxes, probs, labels = decoder(pred, num_classes=len(class_names), score_thr=0.1, nms_thr=0.45)
-            boxes, probs, labels = decoder(pred, num_classes=len(class_names), score_thr=0.001, nms_thr=1.0)
+            # computing map
+            # boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.1, nms_thresh=0.45)
+            # boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.001, nms_thresh=1.0)
+            boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.005, nms_thresh=0.45)
             boxes, probs, labels = boxes.numpy(), probs.numpy(), labels.numpy().astype(np.int32)
             boxes = boxes.clip(min=0, max=1)
 
@@ -199,8 +181,9 @@ def calc_map(logger, test_dataset, trial_log=''):
                 # save in the `label`-th list
                 cls_det_results[ labels[j] ].append([imgid, probs[j], boxes[j][0], boxes[j][1], boxes[j][2], boxes[j][3]])
 
-        _map = voc_eval(logger, cls_det_results, cls_img_gt_results, class_names, iou_thr=0.5, use_07_metric=False)
-        return _map
+        map = voc_eval(logger, cls_det_results, cls_img_gt_results, class_names, iou_thresh=0.5, use_07_metric=False)
+        return map
+
 
 if __name__ == '__main__':
     # preds = {0:[['image01', 0.9, 20, 20, 40, 40],
@@ -211,7 +194,7 @@ if __name__ == '__main__':
     #           (1, 'image01'): {'box':[[60, 60, 91, 91]], 'det': [False]},
     #           (0, 'image02'): {'box':[[30, 30, 51, 51]], 'det': [False]}}
     
-    trial_log = 'haoran'
+    trial_log = 'voc07+12_aug'
 
     import logging
     logger = logging.getLogger(trial_log) 
@@ -224,6 +207,7 @@ if __name__ == '__main__':
     ch.setFormatter(formatter) 
     logger.addHandler(ch)
 
+    # testing
     # voc_eval(logger, preds, target, ['cat','dog'])
     # exit(0)
 
@@ -236,7 +220,7 @@ if __name__ == '__main__':
                              std=[0.229, 0.224, 0.225])
     ])
 
-    test_dataset = YoloV1DatasetVOC(
+    test_dataset = PASCAL_VOC(
         # data_root='/Users/xmhan/data/VOCdevkit',
         data_root='/data/data/VOCdevkit',
         img_prefix='VOC2007',

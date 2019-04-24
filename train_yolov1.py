@@ -103,7 +103,7 @@ def main():
         size_grid_cell=args.size_grid_cell,
         with_difficult=args.with_difficult,
         do_augmentation=args.do_augmentation)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
     # load validation/testing dataset
     val_dataset = PASCAL_VOC(
@@ -115,7 +115,7 @@ def main():
         size_grid_cell=args.size_grid_cell,
         with_difficult=args.with_difficult,
         test_mode=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     logger.info('training dataset: {}'.format(len(train_dataset)))
     logger.info('validation dataset: {}'.format(len(val_dataset)))

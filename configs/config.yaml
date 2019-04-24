@@ -12,6 +12,7 @@ Train:
   num_classes: 20
   lambda_coord: 5
   lambda_noobj: 0.5
+  num_workers: 8
   with_difficult: False
   do_augmentation: True
 

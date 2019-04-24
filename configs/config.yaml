@@ -2,7 +2,7 @@
 Train:
   learning_rate: 0.001
   lr_steps: [75, 105]
-  num_epochs: 137
+  num_epochs: 135
   test_interval: 5
   img_size: 448
   burn_in: 1000

@@ -205,32 +205,33 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
                         obj_coord_loss, obj_conf_loss, noobj_conf_loss, obj_class_loss))
                     vis.plot('train_loss', total_loss/(i+1))
 
-            # save model for inferencing
-            torch.save(model.state_dict(), osp.join(model_path, 'latest.pth'))
+                    # save model for inferencing
+                    torch.save(model.state_dict(), osp.join(model_path, 'latest.pth'))
 
-            # save model for resuming training process
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-            }, osp.join(model_path, 'latest.tar'))
+                    # save model for resuming training process
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                    }, osp.join(model_path, 'latest.tar'))
 
             # evaluate latest model
-            if phase == 'val' and epoch != 0 and epoch % (test_interval-1) == 0:
+            if phase == 'val':
                 current_loss = total_loss / (i+1)
                 if best_loss > current_loss:
                     best_loss = current_loss
                 logger.info('current val loss: {:.4f}, best val Loss: {:.4f}'.format(current_loss, best_loss))
                 vis.plot('val_loss', total_loss/(i+1))
 
-                # save the best model as so far
-                current_map = calc_map(logger, val_dataset, trial_log, conf_thresh, iou_thresh, nms_thresh)
-                if best_map < current_map:
-                    best_map = current_map
-                    torch.save(model.state_dict(), osp.join(model_path, 'best.pth'))
+                if epoch != 0 and epoch % (test_interval-1) == 0:
+                    current_map = calc_map(logger, val_dataset, trial_log, conf_thresh, iou_thresh, nms_thresh)
+                    # save the best model as so far
+                    if best_map < current_map:
+                        best_map = current_map
+                        torch.save(model.state_dict(), osp.join(model_path, 'best.pth'))
 
-                logger.info('current val map: {:.4f}, best val map: {:.4f}'.format(current_map, best_map))
-                vis.plot('val_map', current_map)
+                    logger.info('current val map: {:.4f}, best val map: {:.4f}'.format(current_map, best_map))
+                    vis.plot('val_map', current_map)
 
     time_elapsed = time.time() - since
     logger.info('Training complete in {:.0f}m {:.0f}s'.format(

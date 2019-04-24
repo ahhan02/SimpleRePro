@@ -45,6 +45,11 @@ def main():
         for k, v in config[key].items():
             setattr(args, k, v)
 
+    # seed settings
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+
     # logger and checkpoint settings
     model_path = osp.join(workpath, 'checkpoints', args.trial_log)
     if not osp.exists(model_path):
@@ -52,10 +57,30 @@ def main():
     logger = get_logger(args.trial_log, model_path)
     logger.info(f'args: {args}')
 
-    # seed settings
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
+    # model settings
+    model = resnet50_yolov1(pretrained=True)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
+    start_epoch = 0
+    if args.resume:
+        try:
+            checkpoint = torch.load(osp.join(model_path, 'latest.tar'))
+        except:
+            raise FileNotFoundError
+
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch']
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.device_count() > 1:
+        num_gpus = torch.cuda.device_count()
+        logger.debug(f'Use {num_gpus} GPUs!')
+        model = nn.DataParallel(model)
+        args.batch_size *= num_gpus
+    model.to(device)
+
+    # model statistics
+    summary(model, (3, args.img_size, args.img_size))
 
     # dataset settings
     data_transform = transforms.Compose([
@@ -95,31 +120,6 @@ def main():
     logger.info('training dataset: {}'.format(len(train_dataset)))
     logger.info('validation dataset: {}'.format(len(val_dataset)))
     dataloaders = {'train': train_loader, 'val': val_loader}
-
-    # model settings
-    model = resnet50_yolov1(pretrained=True)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
-    start_epoch = 0
-    if args.resume:
-        try:
-            checkpoint = torch.load(osp.join(model_path, 'latest.tar'))
-        except:
-            raise FileNotFoundError
-
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch']
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if torch.cuda.device_count() > 1:
-        num_gpus = torch.cuda.device_count()
-        logger.debug(f'Use {num_gpus} GPUs!')
-        model = nn.DataParallel(model)
-        args.batch_size *= num_gpus
-    model.to(device)
-
-    # model statistics
-    summary(model, (3, args.img_size, args.img_size))
 
     # loss function
     criterion = YoloV1Loss(device, args.size_grid_cell, 

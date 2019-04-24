@@ -205,15 +205,14 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
                         obj_coord_loss, obj_conf_loss, noobj_conf_loss, obj_class_loss))
                     vis.plot('train_loss', total_loss/(i+1))
 
-                    # save model for inferencing
-                    torch.save(model.state_dict(), osp.join(model_path, 'latest.pth'))
-
-                    # save model for resuming training process
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                    }, osp.join(model_path, 'latest.tar'))
+            # save model for inferencing and resuming training process
+            if phase == 'train':
+                torch.save(model.state_dict(), osp.join(model_path, 'latest.pth'))
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                }, osp.join(model_path, 'latest.tar'))
 
             # evaluate latest model
             if phase == 'val':

@@ -223,13 +223,12 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
                 logger.info('current val loss: {:.4f}, best val Loss: {:.4f}'.format(current_loss, best_loss))
                 vis.plot('val_loss', total_loss/(i+1))
 
-                if epoch != 0 and epoch % (test_interval-1) == 0:
-                    current_map = calc_map(logger, val_dataset, trial_log, conf_thresh, iou_thresh, nms_thresh)
+                if epoch and epoch % (test_interval-1) == 0:
+                    current_map = calc_map(logger, val_dataset, model_path, conf_thresh, iou_thresh, nms_thresh)
                     # save the best model as so far
                     if best_map < current_map:
                         best_map = current_map
                         torch.save(model.state_dict(), osp.join(model_path, 'best.pth'))
-
                     logger.info('current val map: {:.4f}, best val map: {:.4f}'.format(current_map, best_map))
                     vis.plot('val_map', current_map)
 

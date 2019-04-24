@@ -133,14 +133,13 @@ def voc_eval(logger, det_results, gt_results, class_names, iou_thresh=0.5, use_0
     return _map
 
 
-def calc_map(logger, test_dataset, trial_log, conf_thresh, iou_thresh, nms_thresh):
+def calc_map(logger, test_dataset, model_path, conf_thresh, iou_thresh, nms_thresh):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = resnet50_yolov1()
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
 
-    model_path = osp.join(osp.dirname(__file__), 'checkpoints', trial_log)
     if device.type == 'cpu':
         model.load_state_dict(torch.load(osp.join(model_path, 'latest.pth'), map_location='cpu'))
     else:
@@ -170,9 +169,7 @@ def calc_map(logger, test_dataset, trial_log, conf_thresh, iou_thresh, nms_thres
             pred = model(img[None, :, :, :])
 
             # computing map
-            # boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.1, nms_thresh=0.45)
-            # boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.001, nms_thresh=1.0)
-            boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.005, nms_thresh=0.45)
+            boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=conf_thresh, nms_thresh=nms_thresh)
             boxes, probs, labels = boxes.numpy(), probs.numpy(), labels.numpy().astype(np.int32)
             boxes = boxes.clip(min=0, max=1)
 
@@ -181,8 +178,7 @@ def calc_map(logger, test_dataset, trial_log, conf_thresh, iou_thresh, nms_thres
                 # save in the `label`-th list
                 cls_det_results[ labels[j] ].append([imgid, probs[j], boxes[j][0], boxes[j][1], boxes[j][2], boxes[j][3]])
 
-        map = voc_eval(logger, cls_det_results, cls_img_gt_results, class_names, iou_thresh=0.5, use_07_metric=False)
-        return map
+        return voc_eval(logger, cls_det_results, cls_img_gt_results, class_names, iou_thresh=iou_thresh, use_07_metric=False)
 
 
 if __name__ == '__main__':
@@ -195,6 +191,7 @@ if __name__ == '__main__':
     #           (0, 'image02'): {'box':[[30, 30, 51, 51]], 'det': [False]}}
     
     trial_log = 'voc07+12_aug'
+    model_path = osp.join('..', 'checkpoints', trial_log)
 
     import logging
     logger = logging.getLogger(trial_log) 
@@ -230,4 +227,4 @@ if __name__ == '__main__':
         num_debug_imgs=None,
         test_mode=True)
 
-    calc_map(logger, test_dataset, trial_log)
+    calc_map(logger, test_dataset, model_path, 0.005, 0.5, 0.45)

@@ -394,8 +394,8 @@ class PASCAL_VOC(data.Dataset):
         # data augmentation
         if self.do_augmentation:
             # extra augmentation
-            # img, boxes = self.random_scale(img, boxes)
-            # img, boxes, labels = self.random_shift(img, boxes, labels)
+            img, boxes = self.random_scale(img, boxes)
+            img, boxes, labels = self.random_shift(img, boxes, labels)
             img, boxes, labels = self.random_crop(img, boxes, labels)
             img = self.random_photo_metric_distortion(img)
 

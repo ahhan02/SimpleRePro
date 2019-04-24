@@ -1,14 +1,14 @@
 # hyper-parameters settings
 Train:
   learning_rate: 0.001
-  lr_steps: [40, 45]
-  num_epochs: 50
+  lr_steps: [75, 105]
+  num_epochs: 137
   test_interval: 5
   img_size: 448
-  burn_in: 100
+  burn_in: 1000
   batch_size: 16
   num_boxes: 2
-  size_grid_cell: 14
+  size_grid_cell: 7
   num_classes: 20
   lambda_coord: 5
   lambda_noobj: 0.5

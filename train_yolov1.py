@@ -25,7 +25,7 @@ import yaml
 
 parser = argparse.ArgumentParser(
     description='Pytorch Imagenet Training')
-parser.add_argument('--trial_log', default='voc07_aug_14x14')
+parser.add_argument('--trial_log', default='voc07_moreaug_7x7')
 parser.add_argument('--config', default='configs/config.yaml')
 parser.add_argument('--resume', default=False, help='resume')
 args = parser.parse_args()
@@ -69,7 +69,7 @@ def main():
     # load training dataset
     train_dataset = PASCAL_VOC(
         # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/data/VOCdevkit',
+        data_root='/data/datasets/VOCdevkit',
         img_prefix=['VOC2007'],
         ann_file=['VOC2007/ImageSets/Main/train.txt'],
         # img_prefix=['VOC2007', 'VOC2012'],
@@ -83,7 +83,7 @@ def main():
     # load validation/testing dataset
     val_dataset = PASCAL_VOC(
         # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/data/VOCdevkit',
+        data_root='/data/datasets/VOCdevkit',
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/val.txt',
         transform=data_transform,

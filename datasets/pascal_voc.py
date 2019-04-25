@@ -313,35 +313,35 @@ class PASCAL_VOC(data.Dataset):
         return img, boxes
     
     def random_shift(self, img, boxes, labels):
-        # if np.random.randint(2):
-        h, w, c = img.shape
-        mean = [123.675, 116.28, 103.53]    #
-        ratio = 0.4
-        expand_img = np.full((int(h * ratio + h), int(w * ratio + w), c),
-                            mean).astype(img.dtype)
-        expand_img[int(ratio/2 * h) : int(ratio/2 * h + h), int(ratio/2 * w) : int(ratio/2 * w + w)] = img
-        expand_boxes = boxes + np.tile((int(ratio/2 * w), int(ratio/2 * h)), 2)
-        left = int(np.random.uniform(0, ratio * w))
-        top = int(np.random.uniform(0, ratio * h))
-        patch = np.array((int(left), int(top), int(left + w),
-                                  int(top + h)))
+        if np.random.randint(2):
+            h, w, c = img.shape
+            mean = [123.675, 116.28, 103.53]    #
+            ratio = 0.4
+            expand_img = np.full((int(h * ratio + h), int(w * ratio + w), c),
+                                mean).astype(img.dtype)
+            expand_img[int(ratio/2 * h) : int(ratio/2 * h + h), int(ratio/2 * w) : int(ratio/2 * w + w)] = img
+            expand_boxes = boxes + np.tile((int(ratio/2 * w), int(ratio/2 * h)), 2)
+            left = int(np.random.uniform(0, ratio * w))
+            top = int(np.random.uniform(0, ratio * h))
+            patch = np.array((int(left), int(top), int(left + w),
+                                    int(top + h)))
 
-        # center of boxes should inside the crop img
-        center = (expand_boxes[:, :2] + expand_boxes[:, 2:]) / 2
-        mask = (center[:, 0] > patch[0]) * (
-            center[:, 1] > patch[1]) * (center[:, 0] < patch[2]) * (
-                center[:, 1] < patch[3])
-        if not mask.any():
-            return img, boxes, labels
+            # center of boxes should inside the crop img
+            center = (expand_boxes[:, :2] + expand_boxes[:, 2:]) / 2
+            mask = (center[:, 0] > patch[0]) * (
+                center[:, 1] > patch[1]) * (center[:, 0] < patch[2]) * (
+                    center[:, 1] < patch[3])
+            if not mask.any():
+                return img, boxes, labels
 
-        boxes = expand_boxes[mask]
-        labels = labels[mask]
+            boxes = expand_boxes[mask]
+            labels = labels[mask]
 
-        # adjust boxes
-        img = expand_img[patch[1]:patch[3], patch[0]:patch[2]]
-        boxes[:, 2:] = boxes[:, 2:].clip(max=patch[2:])
-        boxes[:, :2] = boxes[:, :2].clip(min=patch[:2])
-        boxes -= np.tile(patch[:2], 2)     
+            # adjust boxes
+            img = expand_img[patch[1]:patch[3], patch[0]:patch[2]]
+            boxes[:, 2:] = boxes[:, 2:].clip(max=patch[2:])
+            boxes[:, :2] = boxes[:, :2].clip(min=patch[:2])
+            boxes -= np.tile(patch[:2], 2)  
         return img, boxes, labels
 
     def random_crop(self, img, boxes, labels):
@@ -476,7 +476,7 @@ if __name__ == '__main__':
         
         boxes = boxes.numpy().astype(np.int16)
         labels = labels.numpy().astype(np.int16)
-        print(boxes, labels)
+        print(boxes, labels, (w, h))
         
         show_result(img, boxes, labels, class_names)
 
@@ -486,5 +486,7 @@ if __name__ == '__main__':
         boxes_gt_ = np.ones((len(boxes_gt), 5))
         boxes_gt_[:, :4] = boxes_gt
         labels_gt -= 1
-        print(boxes_gt_, labels_gt)
+
+        w_gt, h_gt = train_dataset.img_infos[i]['width'], train_dataset.img_infos[i]['height']
+        print(boxes_gt_, labels_gt, (w_gt, h_gt))
         show_result(imgname, boxes_gt_, labels_gt, class_names, bbox_color='red', text_color='red')

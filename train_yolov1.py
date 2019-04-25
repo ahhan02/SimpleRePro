@@ -222,7 +222,7 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
                 logger.info('current val loss: {:.4f}, best val Loss: {:.4f}'.format(current_loss, best_loss))
                 vis.plot('val_loss', total_loss/(i+1))
 
-                if epoch and epoch % (test_interval-1) == 0:
+                if epoch < 10 or (epoch+1) % test_interval == 0:
                     current_map = calc_map(logger, val_dataset, model_path, conf_thresh, iou_thresh, nms_thresh)
                     # save the best model as so far
                     if best_map < current_map:

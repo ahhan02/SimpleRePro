@@ -13,8 +13,8 @@ if __name__ == '__main__':
     trial_log = 'voc07+12_aug'
 
     model = resnet50_yolov1()
-    # if torch.cuda.device_count() > 1:
-    model = nn.DataParallel(model)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
 
     model_path = osp.join(osp.dirname(__file__), 'checkpoints', trial_log)
 

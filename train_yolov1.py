@@ -76,7 +76,11 @@ def main():
         num_gpus = torch.cuda.device_count()
         logger.debug(f'Use {num_gpus} GPUs!')
         model = nn.DataParallel(model)
+        
+        # adjust `batch_size` and `burn_in` 
         args.batch_size *= num_gpus
+        args.burn_in /= num_gpus
+
     model.to(device)
 
     # model statistics

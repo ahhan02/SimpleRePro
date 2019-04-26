@@ -1,11 +1,11 @@
 # hyper-parameters settings
 Train:
   learning_rate: 0.001
-  lr_steps: [75, 105]
-  num_epochs: 135
-  test_interval: 5
-  img_size: 448
   burn_in: 1000
+  lr_steps: [90, 120]
+  num_epochs: 150
+  test_interval: 1
+  img_size: 448
   batch_size: 16
   num_boxes: 2
   size_grid_cell: 7
@@ -17,6 +17,6 @@ Train:
   do_augmentation: True
 
 Test:
-  conf_thresh: 0.1
   iou_thresh: 0.5
+  conf_thresh: 0.005
   nms_thresh: 0.45

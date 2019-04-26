@@ -7,7 +7,7 @@ import os.path as osp
 from collections import defaultdict
 
 
-def decoder(pred, size_grid_cell=7, num_boxes=2, num_classes=20, conf_thresh=0.1, nms_thresh=0.45):
+def decoder(pred, size_grid_cell=7, num_boxes=2, num_classes=20, conf_thresh=0.005, nms_thresh=0.45):
         '''
         @description: 
         @param :

@@ -18,14 +18,13 @@ from utils.voc_eval import calc_map
 import os
 import os.path as osp
 import time
-import random
 import numpy as np
 import argparse
 import yaml
 
 parser = argparse.ArgumentParser(
     description='Pytorch Imagenet Training')
-parser.add_argument('--trial_log', default='voc07_moreaug_7x7')
+parser.add_argument('--trial_log', default='voc07+12_moreaug_7x7')
 parser.add_argument('--config', default='configs/config.yaml')
 parser.add_argument('--resume', default=False, help='resume')
 args = parser.parse_args()
@@ -46,9 +45,8 @@ def main():
             setattr(args, k, v)
 
     # seed settings
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
+    # torch.manual_seed(0)
+    # torch.cuda.manual_seed_all(0)
 
     # logger and checkpoint settings
     model_path = osp.join(workpath, 'checkpoints', args.trial_log)
@@ -84,7 +82,7 @@ def main():
     model.to(device)
 
     # model statistics
-    summary(model, (3, args.img_size, args.img_size))
+    summary(model, input_size=(3, args.img_size, args.img_size), batch_size=args.batch_size)
 
     # dataset settings
     data_transform = transforms.Compose([
@@ -98,7 +96,7 @@ def main():
     # load training dataset
     train_dataset = PASCAL_VOC(
         # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/datasets/VOCdevkit',
+        data_root='/data/data/VOCdevkit',
         # img_prefix=['VOC2007'],
         # ann_file=['VOC2007/ImageSets/Main/train.txt'],
         img_prefix=['VOC2007', 'VOC2012'],
@@ -112,7 +110,7 @@ def main():
     # load validation/testing dataset
     val_dataset = PASCAL_VOC(
         # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/datasets/VOCdevkit',
+        data_root='/data/data/VOCdevkit',
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/test.txt',
         transform=data_transform,
@@ -128,10 +126,10 @@ def main():
     # loss function
     criterion = YoloV1Loss(device, args.size_grid_cell, 
         args.num_boxes, args.num_classes, args.lambda_coord, args.lambda_noobj)
-    train_model(model, criterion, optimizer, dataloaders, val_dataset, model_path, start_epoch, logger, device)
+    train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, logger, device)
 
 
-def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_path, start_epoch, logger, device):
+def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, logger, device):
     since = time.time()
     best_loss = np.inf
     best_map = 0
@@ -227,7 +225,7 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
                 vis.plot('val_loss', total_loss/(i+1))
 
                 if epoch < 10 or (epoch+1) % test_interval == 0:
-                    current_map = calc_map(logger, val_dataset, model_path, conf_thresh, iou_thresh, nms_thresh)
+                    current_map = calc_map(logger, dataloaders[phase].dataset, model_path, conf_thresh, iou_thresh, nms_thresh)
                     # save the best model as so far
                     if best_map < current_map:
                         best_map = current_map
@@ -239,6 +237,7 @@ def train_model(model, criterion, optimizer, dataloaders, val_dataset, model_pat
     logger.info('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     logger.info('Optimization Done.')
+
 
 if __name__ == '__main__':
     main()

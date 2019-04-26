@@ -299,7 +299,7 @@ class ResNetYoloV1(nn.Module):
         x = self.layer5(x)
 
         # XXX It's important to use BN to normalize x when using sigmoid function, 
-        # otherwise all elems maybe 0s or 1s which cause loss be 0.
+        # otherwise all elems maybe 0s or 1s which cause losses be 0s.
         x = self.conv_end(x)
         x = self.bn_end(x)
         x = torch.sigmoid(x)

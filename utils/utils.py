@@ -183,3 +183,8 @@ def get_logger(trial_log, model_path):
 def get_learning_rate(iter_num, base_lr=0.001, burn_in=1000, power=4):
     if iter_num < burn_in:
         return base_lr * pow(iter_num / burn_in, power)
+
+
+def adjust_learning_rate(optimizer, lr):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr

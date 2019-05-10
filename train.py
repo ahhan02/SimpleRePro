@@ -12,7 +12,7 @@ from datasets.pascal_voc import PASCAL_VOC
 from models.backbone import resnet50_yolov1
 from criterions.yololoss import YoloV1Loss
 from utils.visualize import Visualizer
-from utils.utils import get_logger, get_learning_rate
+from utils.utils import get_logger, get_learning_rate, adjust_learning_rate
 from utils.voc_eval import calc_map
 
 import os
@@ -23,8 +23,8 @@ import argparse
 import yaml
 
 parser = argparse.ArgumentParser(
-    description='Pytorch Imagenet Training')
-parser.add_argument('--trial_log', default='voc07+12_moreaug_7x7')
+    description='Pytorch YoloV1 Training')
+parser.add_argument('--trial_log', default='voc07+12_moreaug_14x14')
 parser.add_argument('--config', default='configs/config.yaml')
 parser.add_argument('--resume', default=False, help='resume')
 args = parser.parse_args()
@@ -38,15 +38,16 @@ def main():
     with open(osp.join(workpath, args.config)) as f:
         if yaml.__version__ == '5.1':
             config = yaml.load(f, Loader=yaml.FullLoader)
-        config = yaml.load(f)
+        else:
+            config = yaml.load(f)
 
     for key in config:
         for k, v in config[key].items():
             setattr(args, k, v)
 
     # seed settings
-    # torch.manual_seed(0)
-    # torch.cuda.manual_seed_all(0)
+    torch.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
 
     # logger and checkpoint settings
     model_path = osp.join(workpath, 'checkpoints', args.trial_log)
@@ -57,18 +58,6 @@ def main():
 
     # model settings
     model = resnet50_yolov1(pretrained=True)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
-    start_epoch = 0
-    if args.resume:
-        try:
-            checkpoint = torch.load(osp.join(model_path, 'latest.tar'))
-        except:
-            raise FileNotFoundError
-
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch']
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if torch.cuda.device_count() > 1:
         num_gpus = torch.cuda.device_count()
@@ -78,8 +67,22 @@ def main():
         # adjust `batch_size` and `burn_in` 
         args.batch_size *= num_gpus
         args.burn_in /= num_gpus
-
+        # args.learning_rate *= num_gpus
     model.to(device)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
+
+    start_epoch = 0
+    iter_num = 0
+    if args.resume:
+        try:
+            checkpoint = torch.load(osp.join(model_path, 'latest.tar'))
+        except:
+            raise FileNotFoundError
+
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch']
+        iter_num = checkpoint['iter_num']
 
     # model statistics
     summary(model, input_size=(3, args.img_size, args.img_size), batch_size=args.batch_size)
@@ -94,13 +97,11 @@ def main():
         ])
 
     # load training dataset
+    img_prefixs = args.img_prefix if isinstance(args.img_prefix, list) else [args.img_prefix]
     train_dataset = PASCAL_VOC(
-        # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/data/VOCdevkit',
-        # img_prefix=['VOC2007'],
-        # ann_file=['VOC2007/ImageSets/Main/train.txt'],
-        img_prefix=['VOC2007', 'VOC2012'],
-        ann_file=['VOC2007/ImageSets/Main/trainval.txt', 'VOC2012/ImageSets/Main/trainval.txt'],
+        data_root=args.data_root,
+        img_prefix=img_prefixs,
+        ann_file=[f'{img_prefix}/ImageSets/Main/trainval.txt' for img_prefix in img_prefixs],
         transform=data_transform,
         size_grid_cell=args.size_grid_cell,
         with_difficult=args.with_difficult,
@@ -109,8 +110,7 @@ def main():
 
     # load validation/testing dataset
     val_dataset = PASCAL_VOC(
-        # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/data/VOCdevkit',
+        data_root=args.data_root,
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/test.txt',
         transform=data_transform,
@@ -126,24 +126,27 @@ def main():
     # loss function
     criterion = YoloV1Loss(device, args.size_grid_cell, 
         args.num_boxes, args.num_classes, args.lambda_coord, args.lambda_noobj)
-    train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, logger, device)
+    train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, iter_num, logger, device)
 
 
-def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, logger, device):
+def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoch, iter_num, logger, device):
     since = time.time()
     best_loss = np.inf
     best_map = 0
-    iter_num = 0
     trial_log = args.trial_log
     num_epochs = args.num_epochs
     test_interval = args.test_interval
     burn_in = args.burn_in
     lr = args.learning_rate
     lr_steps = args.lr_steps
+    size_grid_cell = args.size_grid_cell
+    num_boxes = args.num_boxes
+    num_classes = args.num_classes
     conf_thresh = args.conf_thresh
     iou_thresh = args.iou_thresh
     nms_thresh = args.nms_thresh
-    vis = Visualizer(env=trial_log)
+    port = args.port
+    vis = Visualizer(env=trial_log, port=port)
         
     for epoch in range(start_epoch, num_epochs):
         logger.info('Epoch {} / {}'.format(epoch+1, num_epochs))
@@ -152,9 +155,7 @@ def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoc
         # set learning rate manually
         if epoch in lr_steps:
             lr *= 0.1
-
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
+        adjust_learning_rate(optimizer, lr)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -170,13 +171,11 @@ def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoc
                 # warmming up of the learning rate
                 if phase == 'train':
                     if iter_num < args.burn_in:
-                        burn_lr = get_learning_rate(iter_num, lr, burn_in)
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = burn_lr
+                        lr = get_learning_rate(iter_num, lr, burn_in)
+                        adjust_learning_rate(optimizer, lr)
                         iter_num += 1
                     else:
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = lr
+                        adjust_learning_rate(optimizer, lr)
                     
                 inputs = inputs.to(device)
                 targets = targets.to(device)
@@ -211,6 +210,7 @@ def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoc
             if phase == 'train':
                 torch.save(model.state_dict(), osp.join(model_path, 'latest.pth'))
                 torch.save({
+                    'iter_num: ': iter_num,
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
@@ -225,7 +225,8 @@ def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoc
                 vis.plot('val_loss', total_loss/(i+1))
 
                 if epoch < 10 or (epoch+1) % test_interval == 0:
-                    current_map = calc_map(logger, dataloaders[phase].dataset, model_path, conf_thresh, iou_thresh, nms_thresh)
+                    current_map = calc_map(logger, dataloaders[phase].dataset, model_path, 
+                        size_grid_cell, num_boxes, num_classes, conf_thresh, iou_thresh, nms_thresh)
                     # save the best model as so far
                     if best_map < current_map:
                         best_map = current_map

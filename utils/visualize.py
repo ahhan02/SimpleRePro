@@ -12,8 +12,8 @@ class Visualizer(object):
    @return: 
    ''' 
 
-   def __init__(self, env='default', **kwargs):
-       self.vis = visdom.Visdom(env=env, **kwargs)
+   def __init__(self, env='default', port=8097, **kwargs):
+       self.vis = visdom.Visdom(env=env, port=port, **kwargs)
        self.index = {} 
        self.log_text = ''
 
@@ -51,7 +51,7 @@ class Visualizer(object):
    def img(self, name, img_, **kwargs):
        '''
        @description: 
-            self.img('input_img', t.Tensor(64, 64))
+            self.img('input_img',  t.Tensor(64, 64))
             self.img('input_imgs', t.Tensor(3, 64, 64))
             self.img('input_imgs', t.Tensor(100, 1, 64, 64))
             self.img('input_imgs', t.Tensor(100, 3, 64, 64), nrows=10)

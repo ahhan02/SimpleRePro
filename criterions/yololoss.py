@@ -32,7 +32,7 @@ class YoloV1Loss(nn.Module):
         self.lambda_coord = lambda_coord
 
         # adjust `lambda_noobj` according to `size_grid_cell` to prevent the imblance problem
-        self.lambda_noobj = lambda_noobj * 7 / size_grid_cell 
+        self.lambda_noobj = lambda_noobj * (7 / size_grid_cell) ** 2
 
     def calc_iou(self, pred_boxes, target_boxes):
         '''

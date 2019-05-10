@@ -4,29 +4,50 @@ from torchvision import transforms
 import numpy as np
 import os
 import os.path as osp
-import mmcv
 from models.backbone import resnet50_yolov1
 from datasets.pascal_voc import PASCAL_VOC
 from utils.utils import show_result, decoder
-                
+import argparse
+import yaml
+
+parser = argparse.ArgumentParser(
+    description='Pytorch YoloV1 Training')
+parser.add_argument('--trial_log', default='voc07+12_moreaug_14x14')
+parser.add_argument('--config', default='configs/config.yaml')
+parser.add_argument('--resume', default=False, help='resume')
+args = parser.parse_args()
+
+
 if __name__ == '__main__':
-    trial_log = 'voc07+12_aug'
+    global args
+    args = parser.parse_args()
+
+    workpath = osp.abspath(osp.dirname(__file__))
+    with open(osp.join(workpath, args.config)) as f:
+        if yaml.__version__ == '5.1':
+            config = yaml.load(f, Loader=yaml.FullLoader)
+        else:
+            config = yaml.load(f)
+
+    for key in config:
+        for k, v in config[key].items():
+            setattr(args, k, v)
 
     model = resnet50_yolov1()
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
 
-    model_path = osp.join(osp.dirname(__file__), 'checkpoints', trial_log)
-
+    model_file = 'best.pth'
+    model_path = osp.join(osp.dirname(__file__), 'checkpoints', args.trial_log)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if device.type == 'cpu':
-        model.load_state_dict(torch.load(osp.join(model_path, 'best.pth'), map_location='cpu'))
+        model.load_state_dict(torch.load(osp.join(model_path, model_file), map_location='cpu'))
     else:
-        model.load_state_dict(torch.load(osp.join(model_path, 'best.pth')))
+        model.load_state_dict(torch.load(osp.join(model_path, model_file)))
 
     model.eval()
 
-    img_size = 448
+    img_size = args.img_size
     data_transform = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((img_size, img_size)),
@@ -36,11 +57,11 @@ if __name__ == '__main__':
     ])
 
     test_dataset = PASCAL_VOC(
-        data_root='/Users/xmhan/data/VOCdevkit', 
+        data_root=args.data_root, 
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/test.txt',
         transform=data_transform,
-        num_debug_imgs=None,
+        num_debug_imgs=-1,
         test_mode=True)
     
     class_names = PASCAL_VOC.CLASSES

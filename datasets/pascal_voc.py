@@ -38,8 +38,8 @@ class PASCAL_VOC(data.Dataset):
                  img_size=448,
                  do_augmentation=False,
                  transform=None,
-                 num_debug_imgs=None,
                  with_difficult=True,
+                 num_debug_imgs=-1,
                  test_mode=False):
         '''
         @description: load dataset for yolov1
@@ -71,7 +71,7 @@ class PASCAL_VOC(data.Dataset):
             self.img_infos.extend(self.load_annotations(self.img_prefix[i], self.ann_file[i]))
         
         # tiny dataset
-        if self.num_debug_imgs is not None:
+        if self.num_debug_imgs != -1:
             self.img_infos = self.img_infos[:int(self.num_debug_imgs)]
 
     def load_annotations(self, img_prefix, ann_file):
@@ -457,6 +457,7 @@ if __name__ == '__main__':
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/train.txt',
         transform=data_transform,
+        size_grid_cell=14,
         with_difficult=False,
         do_augmentation=True,
         num_debug_imgs=64)

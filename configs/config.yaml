@@ -1,20 +1,25 @@
 # hyper-parameters settings
 Train:
+  data_root: '/Users/xmhan/data/VOCdevkit'
+  img_prefix: ['VOC2007', 'VOC2012']
   learning_rate: 0.001
+  momentum: 0.9
+  weight_decay: 0.0005
   burn_in: 1000
-  lr_steps: [90, 120]
-  num_epochs: 150
+  lr_steps: [100, 130]
+  num_epochs: 160
   test_interval: 1
   img_size: 448
   batch_size: 16
   num_boxes: 2
-  size_grid_cell: 7
+  size_grid_cell: 14
   num_classes: 20
   lambda_coord: 5
   lambda_noobj: 0.5
   num_workers: 4
   with_difficult: False
   do_augmentation: True
+  num_debug_imgs: -1
 
 Test:
   iou_thresh: 0.5

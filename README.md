@@ -1,4 +1,4 @@
-# An pytorch implementation of yolov1
+# A pytorch implementation of yolov1
 
 With resnet-50, we obtain 65.12% map.
 

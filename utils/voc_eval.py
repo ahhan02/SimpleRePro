@@ -11,7 +11,7 @@ import numpy as np
 from datasets.pascal_voc import PASCAL_VOC
 from models.backbone import resnet50_yolov1
 import mmcv
-from utils.utils import decoder
+from utils.util import decoder
 import tqdm
 from collections import defaultdict
 
@@ -136,19 +136,17 @@ def voc_eval(logger, det_results, gt_results, class_names, iou_thresh=0.5, use_0
     return _map
 
 
-def calc_map(logger, test_dataset, model_path, 
+def calc_map(logger, test_dataset, model_path, model_file,
              size_grid_cell, num_boxes, num_classes, 
              conf_thresh, iou_thresh, nms_thresh):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     model = resnet50_yolov1()
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
+    model = nn.DataParallel(model)
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if device.type == 'cpu':
-        model.load_state_dict(torch.load(osp.join(model_path, 'best.pth'), map_location='cpu'))
+        model.load_state_dict(torch.load(osp.join(model_path, model_file), map_location='cpu'))
     else:
-        model.load_state_dict(torch.load(osp.join(model_path, 'best.pth')))
+        model.load_state_dict(torch.load(osp.join(model_path, model_file)))
 
     model.to(device)
     model.eval()
@@ -184,52 +182,3 @@ def calc_map(logger, test_dataset, model_path,
                 cls_det_results[ labels[j] ].append([imgid, probs[j], boxes[j][0], boxes[j][1], boxes[j][2], boxes[j][3]])
 
         return voc_eval(logger, cls_det_results, cls_img_gt_results, class_names, iou_thresh=iou_thresh, use_07_metric=False)
-
-
-if __name__ == '__main__':
-    # preds = {0:[['image01', 0.9, 20, 20, 40, 40],
-    #             ['image01', 0.8, 20, 20, 50, 50],
-    #             ['image02', 0.8, 30, 30, 50, 50]],
-    #          1:[['image01', 0.78, 60, 60, 90, 90]]}
-    # target = {(0, 'image01'): {'box':[[20, 20, 41, 41]], 'det': [False]},
-    #           (1, 'image01'): {'box':[[60, 60, 91, 91]], 'det': [False]},
-    #           (0, 'image02'): {'box':[[30, 30, 51, 51]], 'det': [False]}}
-    
-    trial_log = 'voc07+12_moreaug_14x14'
-    model_path = osp.join('..', 'checkpoints', trial_log)
-
-    import logging
-    logger = logging.getLogger(trial_log) 
-    logger.setLevel(logging.DEBUG) 
-
-    ch = logging.StreamHandler() 
-    ch.setLevel(logging.DEBUG) 
-    
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s') 
-    ch.setFormatter(formatter) 
-    logger.addHandler(ch)
-
-    # testing
-    # voc_eval(logger, preds, target, ['cat','dog'])
-    # exit(0)
-
-    img_size = 448
-    data_transform = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.Resize((img_size, img_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
-    ])
-
-    test_dataset = PASCAL_VOC(
-        # data_root='/Users/xmhan/data/VOCdevkit',
-        data_root='/data/data/VOCdevkit',
-        img_prefix='VOC2007',
-        ann_file='VOC2007/ImageSets/Main/test.txt',
-        transform=data_transform,
-        with_difficult=False,
-        num_debug_imgs=None,
-        test_mode=True)
-
-    calc_map(logger, test_dataset, model_path, 14, 2, 20, 0.005, 0.5, 0.45)

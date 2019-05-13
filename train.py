@@ -12,7 +12,7 @@ from datasets.pascal_voc import PASCAL_VOC
 from models.backbone import resnet50_yolov1
 from criterions.yololoss import YoloV1Loss
 from utils.visualize import Visualizer
-from utils.utils import get_logger, get_learning_rate, adjust_learning_rate
+from utils.util import get_logger, get_learning_rate, adjust_learning_rate
 from utils.voc_eval import calc_map
 
 import os
@@ -24,7 +24,7 @@ import yaml
 
 parser = argparse.ArgumentParser(
     description='Pytorch YoloV1 Training')
-parser.add_argument('--trial_log', default='voc07+12_moreaug_14x14')
+parser.add_argument('--trial_log', default='voc07+12_weight')
 parser.add_argument('--config', default='configs/config.yaml')
 parser.add_argument('--resume', default=False, help='resume')
 args = parser.parse_args()
@@ -171,8 +171,8 @@ def train_model(model, criterion, optimizer, dataloaders, model_path, start_epoc
                 # warmming up of the learning rate
                 if phase == 'train':
                     if iter_num < args.burn_in:
-                        lr = get_learning_rate(iter_num, lr, burn_in)
-                        adjust_learning_rate(optimizer, lr)
+                        burn_lr = get_learning_rate(iter_num, lr, burn_in)
+                        adjust_learning_rate(optimizer, burn_lr)
                         iter_num += 1
                     else:
                         adjust_learning_rate(optimizer, lr)

@@ -1,6 +1,7 @@
 # hyper-parameters settings
 Train:
   data_root: '/Users/xmhan/data/VOCdevkit'
+  # data_root: '/data/data/VOCdevkit'
   img_prefix: ['VOC2007', 'VOC2012']
   learning_rate: 0.001
   momentum: 0.9
@@ -20,6 +21,7 @@ Train:
   with_difficult: False
   do_augmentation: True
   num_debug_imgs: -1
+  port: 8097
 
 Test:
   iou_thresh: 0.5

@@ -103,9 +103,6 @@ class PASCAL_VOC(data.Dataset):
             idx: index of sample
         @return: 
         '''
-        # img_id = self.img_infos[idx]['id']
-        # xml_path = osp.join(self.img_prefix, 'Annotations',
-        #                     '{}.xml'.format(img_id))
         xml_path = self.img_infos[idx]['xml_path']
         tree = ET.parse(xml_path)
         root = tree.getroot()

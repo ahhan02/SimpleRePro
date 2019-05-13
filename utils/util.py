@@ -141,7 +141,7 @@ def nms(bboxes, probs, labels, num_classes, nms_thresh=0.45):
 
 
 def show_result(img, bboxes, labels, class_names, conf_thresh=0.1, thickness=1, font_scale=0.5, 
-    bbox_color='green', text_color='green'):
+    bbox_color='green', text_color='green', out_file=None):
     img = mmcv.imread(img)
     mmcv.imshow_det_bboxes(
         img.copy(),
@@ -152,7 +152,8 @@ def show_result(img, bboxes, labels, class_names, conf_thresh=0.1, thickness=1, 
         thickness=thickness, 
         font_scale=font_scale,
         bbox_color=bbox_color,
-        text_color=text_color)
+        text_color=text_color,
+        out_file=out_file)
 
 
 def get_logger(trial_log, model_path):

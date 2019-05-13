@@ -6,7 +6,8 @@ import os
 import os.path as osp
 from models.backbone import resnet50_yolov1
 from datasets.pascal_voc import PASCAL_VOC
-from utils.utils import show_result, decoder
+from utils.util import show_result, decoder, get_logger
+from utils.voc_eval import calc_map
 import argparse
 import yaml
 
@@ -14,11 +15,10 @@ parser = argparse.ArgumentParser(
     description='Pytorch YoloV1 Training')
 parser.add_argument('--trial_log', default='voc07+12_moreaug_14x14')
 parser.add_argument('--config', default='configs/config.yaml')
-parser.add_argument('--resume', default=False, help='resume')
 args = parser.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     global args
     args = parser.parse_args()
 
@@ -33,19 +33,8 @@ if __name__ == '__main__':
         for k, v in config[key].items():
             setattr(args, k, v)
 
-    model = resnet50_yolov1()
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-
     model_file = 'best.pth'
     model_path = osp.join(osp.dirname(__file__), 'checkpoints', args.trial_log)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if device.type == 'cpu':
-        model.load_state_dict(torch.load(osp.join(model_path, model_file), map_location='cpu'))
-    else:
-        model.load_state_dict(torch.load(osp.join(model_path, model_file)))
-
-    model.eval()
 
     img_size = args.img_size
     data_transform = transforms.Compose([
@@ -61,34 +50,14 @@ if __name__ == '__main__':
         img_prefix='VOC2007', 
         ann_file='VOC2007/ImageSets/Main/test.txt',
         transform=data_transform,
-        num_debug_imgs=-1,
+        num_debug_imgs=args.num_debug_imgs,
         test_mode=True)
-    
-    class_names = PASCAL_VOC.CLASSES
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    with torch.no_grad():
-        for i, (img, target) in enumerate(test_dataset):
-            imgname = test_dataset.img_infos[i]['filename']
-            print(i, imgname)
+    logger = get_logger(args.trial_log, model_path)
+    calc_map(logger, test_dataset, model_path, model_file,
+             args.size_grid_cell, args.num_boxes, args.num_classes,
+             args.conf_thresh, args.iou_thresh, args.nms_thresh)
 
-            w, h = test_dataset.img_infos[i]['width'], test_dataset.img_infos[i]['height']
-            ann = test_dataset.get_ann_info(i)
 
-            img = img.to(device)
-            pred = model(img[None, :, :, :])
-
-            boxes, probs, labels = decoder(pred, num_classes=len(class_names), conf_thresh=0.15, nms_thresh=0.45)
-            boxes = boxes.numpy().clip(min=0, max=1)
-            boxes *= np.array([w, h, w, h])
-            probs = probs.numpy()
-
-            boxes = np.concatenate((boxes, probs[:, np.newaxis]), 1)
-            labels = labels.numpy().astype(np.int32)
-            show_result(imgname, boxes, labels, class_names)
-
-            boxes_gt, labels_gt = test_dataset.decoder(target)
-            boxes_gt[:, :4] *= torch.Tensor([w, h, w, h])
-            boxes_gt = boxes_gt.numpy().astype(np.int32)
-            labels_gt = labels_gt.numpy().astype(np.int32)
-            show_result(imgname, boxes_gt, labels_gt, class_names, bbox_color='red', text_color='red')
+if __name__ == '__main__':
+    main()
